@@ -1,0 +1,21 @@
+{
+  "" : {
+    "const-values" : "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/build/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/MLXSTMBot-primary.swiftconstvalues",
+    "dependencies" : "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/build/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/MLXSTMBot-primary.d",
+    "diagnostics" : "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/build/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/MLXSTMBot-primary.dia",
+    "emit-module-dependencies" : "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/build/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/MLXSTMBot-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/build/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/MLXSTMBot-primary-emit-module.dia",
+    "pch" : "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/build/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/MLXSTMBot-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/build/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/MLXSTMBot-primary.swiftdeps"
+  },
+  "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/MLXSTMBot/LSTMUtils.swift" : {
+    "index-unit-output-path" : "/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/LSTMUtils.o",
+    "llvm-bc" : "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/build/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/LSTMUtils.bc",
+    "object" : "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/build/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/LSTMUtils.o"
+  },
+  "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/MLXSTMBot/main.swift" : {
+    "index-unit-output-path" : "/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/main.o",
+    "llvm-bc" : "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/build/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/main.bc",
+    "object" : "/Users/suad/ProjektePrivate/XcodeProjekte/MLXSTMBot/build/MLXSTMBot.build/Release/MLXSTMBot.build/Objects-normal/arm64/main.o"
+  }
+}

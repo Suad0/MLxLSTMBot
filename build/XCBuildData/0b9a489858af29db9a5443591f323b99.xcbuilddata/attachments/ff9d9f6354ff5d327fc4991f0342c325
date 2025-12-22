@@ -1,0 +1,16 @@
+{
+  "" : {
+    "const-values" : "/Users/suad/Library/Developer/Xcode/DerivedData/MLXSTMBot-hdmhrxpyeuygosdbxnfzjccllxdl/SourcePackages/checkouts/mlx-swift/build/mlx-swift.build/Release/MLXFFT.build/Objects-normal/arm64/MLXFFT-primary.swiftconstvalues",
+    "dependencies" : "/Users/suad/Library/Developer/Xcode/DerivedData/MLXSTMBot-hdmhrxpyeuygosdbxnfzjccllxdl/SourcePackages/checkouts/mlx-swift/build/mlx-swift.build/Release/MLXFFT.build/Objects-normal/arm64/MLXFFT-primary.d",
+    "diagnostics" : "/Users/suad/Library/Developer/Xcode/DerivedData/MLXSTMBot-hdmhrxpyeuygosdbxnfzjccllxdl/SourcePackages/checkouts/mlx-swift/build/mlx-swift.build/Release/MLXFFT.build/Objects-normal/arm64/MLXFFT-primary.dia",
+    "emit-module-dependencies" : "/Users/suad/Library/Developer/Xcode/DerivedData/MLXSTMBot-hdmhrxpyeuygosdbxnfzjccllxdl/SourcePackages/checkouts/mlx-swift/build/mlx-swift.build/Release/MLXFFT.build/Objects-normal/arm64/MLXFFT-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/suad/Library/Developer/Xcode/DerivedData/MLXSTMBot-hdmhrxpyeuygosdbxnfzjccllxdl/SourcePackages/checkouts/mlx-swift/build/mlx-swift.build/Release/MLXFFT.build/Objects-normal/arm64/MLXFFT-primary-emit-module.dia",
+    "pch" : "/Users/suad/Library/Developer/Xcode/DerivedData/MLXSTMBot-hdmhrxpyeuygosdbxnfzjccllxdl/SourcePackages/checkouts/mlx-swift/build/mlx-swift.build/Release/MLXFFT.build/Objects-normal/arm64/MLXFFT-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/suad/Library/Developer/Xcode/DerivedData/MLXSTMBot-hdmhrxpyeuygosdbxnfzjccllxdl/SourcePackages/checkouts/mlx-swift/build/mlx-swift.build/Release/MLXFFT.build/Objects-normal/arm64/MLXFFT-primary.swiftdeps"
+  },
+  "/Users/suad/Library/Developer/Xcode/DerivedData/MLXSTMBot-hdmhrxpyeuygosdbxnfzjccllxdl/SourcePackages/checkouts/mlx-swift/Source/MLXFFT/FFT.swift" : {
+    "index-unit-output-path" : "/mlx-swift.build/Release/MLXFFT.build/Objects-normal/arm64/FFT.o",
+    "llvm-bc" : "/Users/suad/Library/Developer/Xcode/DerivedData/MLXSTMBot-hdmhrxpyeuygosdbxnfzjccllxdl/SourcePackages/checkouts/mlx-swift/build/mlx-swift.build/Release/MLXFFT.build/Objects-normal/arm64/FFT.bc",
+    "object" : "/Users/suad/Library/Developer/Xcode/DerivedData/MLXSTMBot-hdmhrxpyeuygosdbxnfzjccllxdl/SourcePackages/checkouts/mlx-swift/build/mlx-swift.build/Release/MLXFFT.build/Objects-normal/arm64/FFT.o"
+  }
+}
