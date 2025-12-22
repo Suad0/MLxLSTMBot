@@ -1,0 +1,58 @@
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+
+# --- Xcode / Swift ---
+build/
+DerivedData/
+*.xcuserstate
+project.xcworkspace/xcuserdata/
+*.bundle
+*.xcscmblueprint
+*.xccheckout
+# Swift Package Manager local configuration
+.swiftpm/
+.build/
+
+
+# --- MLX & Machine Learning Weights ---
+# Never commit large binary weights to Git!
+*.safetensors
+*.bin
+*.pth
+*.mlmodel
+*.mlpackage
+*.gguf
+
+# Ignore local model storage folders
+models/
+weights/
+checkpoints/
+
+
+# --- Data & Tokenizers ---
+# Ignore raw datasets and processed JSON training data
+*.jsonl
+# If your data is in a specific folder, ignore the whole folder
+data/
+datasets/
+# Hugging Face caches or local downloads
+.cache/
+tokenizers/
+
+
+# --- Configuration & Secrets ---
+.env
+.env.*
+secrets.json
+
+
+# --- Miscellaneous ---
+*.log
+.temp/
+tmp/
+
+.kiro
