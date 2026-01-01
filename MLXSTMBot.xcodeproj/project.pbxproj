@@ -12,6 +12,9 @@
 		118C25A72EF9A06C00E99E95 /* MLXFast in Frameworks */ = {isa = PBXBuildFile; productRef = 118C25A62EF9A06C00E99E95 /* MLXFast */; };
 		118C25A92EF9A06C00E99E95 /* MLXLinalg in Frameworks */ = {isa = PBXBuildFile; productRef = 118C25A82EF9A06C00E99E95 /* MLXLinalg */; };
 		118C25AB2EF9A06C00E99E95 /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = 118C25AA2EF9A06C00E99E95 /* MLXNN */; };
+		11FB20B72F01E52A003E876F /* MLXEmbedders in Frameworks */ = {isa = PBXBuildFile; productRef = 11FB20B62F01E52A003E876F /* MLXEmbedders */; };
+		11FB20B92F01E52A003E876F /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 11FB20B82F01E52A003E876F /* MLXLLM */; };
+		11FB20BB2F01E52A003E876F /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 11FB20BA2F01E52A003E876F /* MLXLMCommon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -43,10 +46,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				11FB20B92F01E52A003E876F /* MLXLLM in Frameworks */,
 				118C25A72EF9A06C00E99E95 /* MLXFast in Frameworks */,
 				118C25A92EF9A06C00E99E95 /* MLXLinalg in Frameworks */,
+				11FB20B72F01E52A003E876F /* MLXEmbedders in Frameworks */,
 				118C25A32EF9A06C00E99E95 /* MLX in Frameworks */,
 				118C25AB2EF9A06C00E99E95 /* MLXNN in Frameworks */,
+				11FB20BB2F01E52A003E876F /* MLXLMCommon in Frameworks */,
 				118C25A52EF9A06C00E99E95 /* MLXFFT in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -95,6 +101,9 @@
 				118C25A62EF9A06C00E99E95 /* MLXFast */,
 				118C25A82EF9A06C00E99E95 /* MLXLinalg */,
 				118C25AA2EF9A06C00E99E95 /* MLXNN */,
+				11FB20B62F01E52A003E876F /* MLXEmbedders */,
+				11FB20B82F01E52A003E876F /* MLXLLM */,
+				11FB20BA2F01E52A003E876F /* MLXLMCommon */,
 			);
 			productName = MLXSTMBot;
 			productReference = 118C25972EF9A00400E99E95 /* MLXSTMBot */;
@@ -126,6 +135,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				118C25A12EF9A06C00E99E95 /* XCRemoteSwiftPackageReference "mlx-swift" */,
+				11FB20B52F01E52A003E876F /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 118C25982EF9A00400E99E95 /* Products */;
@@ -326,6 +336,14 @@
 				minimumVersion = 0.29.1;
 			};
 		};
+		11FB20B52F01E52A003E876F /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.29.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -353,6 +371,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 118C25A12EF9A06C00E99E95 /* XCRemoteSwiftPackageReference "mlx-swift" */;
 			productName = MLXNN;
+		};
+		11FB20B62F01E52A003E876F /* MLXEmbedders */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 11FB20B52F01E52A003E876F /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXEmbedders;
+		};
+		11FB20B82F01E52A003E876F /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 11FB20B52F01E52A003E876F /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLLM;
+		};
+		11FB20BA2F01E52A003E876F /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 11FB20B52F01E52A003E876F /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
+			productName = MLXLMCommon;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

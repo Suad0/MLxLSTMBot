@@ -162,7 +162,7 @@ public struct LSTMUtils {
     /// Checks if tensor contains NaN or infinite values
     /// - Parameter tensor: Tensor to check
     /// - Returns: True if tensor contains NaN or infinite values
-    private static func hasNaNOrInf(_ tensor: MLXArray) -> Bool {
+    public static func hasNaNOrInf(_ tensor: MLXArray) -> Bool {
         // Check for NaN: NaN != NaN
         let hasNaN = MLX.any(tensor .!= tensor).item(Bool.self)
         
@@ -225,8 +225,9 @@ public struct LSTMUtils {
     /// - Parameter tensor: Input tensor
     /// - Returns: Clamped tensor
     public static func clampExponential(_ tensor: MLXArray) -> MLXArray {
-        // Clamp input to exp to prevent overflow (exp(50) is already very large)
-        return MLX.clip(tensor, min: -50.0, max: 50.0)
+        // Use very conservative bounds to prevent numerical instability during training
+        // exp(5) ≈ 148, exp(-5) ≈ 0.007 - much safer for gradient computation
+        return MLX.clip(tensor, min: -5.0, max: 5.0)
     }
     
     // MARK: - Device Helpers
