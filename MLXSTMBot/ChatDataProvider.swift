@@ -2,7 +2,7 @@
 //  ChatDataProvider.swift
 //  MLXSTMBot
 //
-//  Created by Kiro on 22.12.25.
+//  Created by Suad on 22.12.25.
 //
 
 import Foundation

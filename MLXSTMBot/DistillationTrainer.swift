@@ -2,7 +2,7 @@
 //  DistillationTrainer.swift
 //  MLXSTMBot
 //
-//  Created by Kiro on 22.12.25.
+//  Created by Suad on 22.12.25.
 //
 
 import Foundation
@@ -132,6 +132,15 @@ public class DistillationTrainer {
             // targets: [batch_size, seq_len]
             
             let vocabSize = studentLogits.shape[2]
+            
+             // Debug: Check for NaNs
+            if LSTMUtils.hasNaNOrInf(studentLogits) {
+                 print("  DEBUG: Student Logits contain NaN/Inf")
+            }
+            if LSTMUtils.hasNaNOrInf(teacherLogits) {
+                 print("  DEBUG: Teacher Logits contain NaN/Inf")
+            }
+            
             let flatStudentLogits = studentLogits.reshaped([-1, vocabSize]) // [batch_size * seq_len, vocab_size]
             let flatTargets = targets.reshaped([-1]) // [batch_size * seq_len]
             let flatTeacherLogits = teacherLogits.reshaped([-1, vocabSize]) // [batch_size * seq_len, vocab_size]
@@ -140,7 +149,7 @@ public class DistillationTrainer {
             let groundTruthLoss = MLXNN.crossEntropy(
                 logits: flatStudentLogits,
                 targets: flatTargets
-            )
+            ).mean()
             
             // Compute distillation loss (KL divergence)
             let distillationLoss = computeKLDivergence(
@@ -148,6 +157,8 @@ public class DistillationTrainer {
                 teacherLogits: flatTeacherLogits,
                 temperature: self.temperature
             )
+            
+            print("  DEBUG: GT Loss: \(groundTruthLoss.item(Float.self)), Distill Loss: \(distillationLoss.item(Float.self))")
             
             // Combine losses
             let totalLoss = self.groundTruthWeight * groundTruthLoss + 
@@ -181,25 +192,15 @@ public class DistillationTrainer {
             throw DistillationError.teacherInferenceFailed("No teacher model available")
         }
         
-        // For the teacher model, we need to perform inference without gradients
-        // This is a simplified version - in practice, you'd need to adapt this
-        // to work with the specific teacher model interface
+        // Wrap inputs in LMInput.Text for the LanguageModel protocol
+        let textInput = LMInput.Text(tokens: inputs)
         
-        // Since we can't easily access the teacher model's forward pass directly,
-        // we'll create a placeholder that matches the expected output shape
-        // In a real implementation, you would call the teacher model's inference method
+        // Perform inference using the teacher model
+        // Passing cache: nil ensures the model processes the entire sequence in parallel
+        // output.logits shape: [batch_size, seq_len, vocab_size]
+        let output = teacher(textInput, cache: nil, state: nil)
         
-        let batchSize = inputs.shape[0]
-        let seqLen = inputs.shape[1]
-        let vocabSize = studentModel.vocabSize
-        
-        // Create dummy teacher logits (in practice, replace with actual teacher inference)
-        // This should be replaced with actual teacher model inference
-        let teacherLogits = MLX.zeros([batchSize, seqLen, vocabSize])
-        
-        print("Warning: Using dummy teacher logits. Replace with actual teacher model inference.")
-        
-        return teacherLogits
+        return output.logits
     }
     
     /// Computes KL divergence loss between student and teacher logits

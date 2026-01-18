@@ -14,7 +14,14 @@ echo "=========================="
 
 # Build the project
 echo "Building project..."
-xcodebuild -project MLXSTMBot.xcodeproj -scheme MLXSTMBot build
+xcodebuild -project MLXSTMBot.xcodeproj -scheme MLXSTMBot build -derivedDataPath build
+
+# Find and copy the executable to a predictable location
+BUILT_APP=$(find build -name "MLXSTMBot" -type f -path "*/Products/*" | head -1)
+if [ -n "$BUILT_APP" ]; then
+    cp "$BUILT_APP" ./build/MLXSTMBot
+    echo "Copied executable to ./build/MLXSTMBot"
+fi
 
 # Check if build was successful
 if [ $? -eq 0 ]; then

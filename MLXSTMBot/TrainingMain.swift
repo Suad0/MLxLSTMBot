@@ -91,10 +91,12 @@ public class TrainingMain {
         
         print("\n✓ Teacher model loaded successfully")
         
-        // For now, we'll skip the teacher model and just use the student model
-        // In a real implementation, you would need to access the model through the container's interface
-        self.teacherModel = nil
-        
+        // Enable Teacher Model
+        self.teacherModel = await container.perform { $0.model }
+        if self.teacherModel == nil {
+             print("Warning: Could not load teacher model. Distillation might fail.")
+        }
+
         // Initialize student xLSTM model
         print("Initializing student xLSTM model...")
         self.studentModel = try xLSTM(
@@ -147,15 +149,13 @@ public class TrainingMain {
             fatalError("Student model not initialized")
         }
         
-        // For now, we'll skip teacher model and just train the student model
-        // In a real implementation, you would use the actual teacher model
         self.trainer = DistillationTrainer(
             studentModel: student,
-            teacherModel: nil,
+            teacherModel: self.teacherModel,
             learningRate: config.learningRate,
             temperature: 2.0,
-            distillationWeight: 0.0,  // No distillation without teacher
-            groundTruthWeight: 1.0    // Pure supervised learning
+            distillationWeight: 0.7,
+            groundTruthWeight: 0.3
         )
         
         print("✓ Distillation trainer initialized (student-only mode)")
