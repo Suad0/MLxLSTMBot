@@ -1,4 +1,0 @@
-module MLXFast {
-header "MLXFast-Swift.h"
-export *
-}

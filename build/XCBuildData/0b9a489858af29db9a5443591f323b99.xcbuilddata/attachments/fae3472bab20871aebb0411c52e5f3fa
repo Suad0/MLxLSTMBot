@@ -1,4 +1,0 @@
-module MLXLinalg {
-header "MLXLinalg-Swift.h"
-export *
-}

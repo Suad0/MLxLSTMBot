@@ -250,14 +250,8 @@ public class DistillationTrainer {
         if totalNorm > maxNorm {
             let scale = maxNorm / totalNorm
             
-            // Create new clipped gradients by scaling each gradient
-            var clippedDict: [String: NestedItem<String, MLXArray>] = [:]
-            for (key, grad) in gradients.flattened() {
-                clippedDict[key] = .value(grad * scale)
-            }
-            
-            // Convert back to ModuleParameters
-            let clippedGradients = ModuleParameters(values: clippedDict)
+            // Apply scaling while preserving the nested structure
+            let clippedGradients = gradients.mapValues { $0 * scale }
             
             print("Gradient clipping applied: norm=\(totalNorm), scale=\(scale)")
             return clippedGradients
@@ -301,10 +295,16 @@ public class DistillationTrainer {
     public func saveTrainingStats(to path: String) throws {
         let stats = [
             "total_steps": currentStep,
-            "final_loss": lossHistory.last ?? 0.0,
-            "average_loss_last_10": averageLoss(overLast: 10),
-            "loss_history": lossHistory
+            "final_loss": Double(lossHistory.last ?? 0.0),
+            "average_loss_last_10": Double(averageLoss(overLast: 10)),
+            "loss_history": lossHistory.map { Double($0) }
         ] as [String : Any]
+        
+        // Ensure directory exists
+        let directoryURL = URL(fileURLWithPath: path).deletingLastPathComponent()
+        if !FileManager.default.fileExists(atPath: directoryURL.path) {
+            try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        }
         
         let jsonData = try JSONSerialization.data(withJSONObject: stats, options: .prettyPrinted)
         let url = URL(fileURLWithPath: path)

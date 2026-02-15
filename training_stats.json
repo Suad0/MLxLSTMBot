@@ -1,0 +1,8 @@
+{
+  "total_steps" : 1,
+  "loss_history" : [
+    6.1294336318969727
+  ],
+  "final_loss" : 6.1294336318969727,
+  "average_loss_last_10" : 6.1294336318969727
+}

@@ -1,4 +1,0 @@
-module MLXFFT {
-header "MLXFFT-Swift.h"
-export *
-}
