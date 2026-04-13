@@ -161,8 +161,9 @@ public class DistillationTrainer {
             print("  DEBUG: GT Loss: \(groundTruthLoss.item(Float.self)), Distill Loss: \(distillationLoss.item(Float.self))")
             
             // Combine losses
-            let totalLoss = self.groundTruthWeight * groundTruthLoss + 
-                           self.distillationWeight * distillationLoss
+            let distillWeight = (self.teacherModel != nil) ? self.distillationWeight : 0.0
+            let totalLoss = self.groundTruthWeight * groundTruthLoss +
+                           distillWeight * distillationLoss
             
             return totalLoss
         }
@@ -175,10 +176,12 @@ public class DistillationTrainer {
         
         // Update model parameters
         optimizer.update(model: studentModel, gradients: clippedGradients)
-        
         // Record loss
         let lossValue = loss.item(Float.self)
         lossHistory.append(lossValue)
+        
+        // Force evaluation of the graph once per step, rather than sequentially per-timestep
+        MLX.eval(studentModel, optimizer)
         
         return lossValue
     }
@@ -209,27 +212,27 @@ public class DistillationTrainer {
     ///   - teacherLogits: Teacher model logits
     ///   - temperature: Temperature for softmax
     /// - Returns: KL divergence loss
-    private func computeKLDivergence(studentLogits: MLXArray, teacherLogits: MLXArray, temperature: Float) -> MLXArray {
-        // Apply temperature scaling
-        let scaledStudentLogits = studentLogits / temperature
-        let scaledTeacherLogits = teacherLogits / temperature
-        
-        // Compute softmax probabilities
-        let studentProbs = MLX.softmax(scaledStudentLogits, axis: -1)
-        let teacherProbs = MLX.softmax(scaledTeacherLogits, axis: -1)
-        
-        // Compute KL divergence: KL(teacher || student)
-        // KL(P || Q) = sum(P * log(P / Q))
-        let logStudentProbs = MLX.log(studentProbs + 1e-8) // Add small epsilon for numerical stability
-        let logTeacherProbs = MLX.log(teacherProbs + 1e-8)
-        
+    private func computeKLDivergence(
+        studentLogits: MLXArray,
+        teacherLogits: MLXArray,
+        temperature: Float
+    ) -> MLXArray {
+        let scaledStudent = studentLogits / temperature
+        let scaledTeacher = teacherLogits / temperature
+
+        // Use logSoftmax on both sides — numerically stable via log-sum-exp trick
+        // This avoids log(~0) = -inf that occurs when computing log(softmax(...)) explicitly
+        let logStudentProbs = MLXNN.logSoftmax(scaledStudent, axis: -1)
+        let logTeacherProbs = MLXNN.logSoftmax(scaledTeacher, axis: -1)
+
+        // exp(logSoftmax) is bounded [0,1] — never explodes
+        let teacherProbs = MLX.exp(logTeacherProbs)
+
+        // KL(teacher || student) = sum(teacher * (log_teacher - log_student))
         let klDiv = teacherProbs * (logTeacherProbs - logStudentProbs)
-        
-        // Sum over vocabulary dimension and take mean over batch
-        let klLoss = MLX.mean(MLX.sum(klDiv, axis: -1))
-        
-        // Scale by temperature squared (standard practice in distillation)
-        return klLoss * (temperature * temperature)
+
+        // Mean over batch, sum over vocabulary dimension
+        return MLX.mean(MLX.sum(klDiv, axis: -1)) * (temperature * temperature)
     }
     
     /// Clips gradients to prevent exploding gradients
@@ -350,7 +353,7 @@ extension DistillationTrainer {
         let batchSize = inputs.shape[0]
         
         // Get teacher logits (skip if no teacher)
-        let teacherLogits = if let teacher = teacherModel {
+        let teacherLogits = if teacherModel != nil {
             try getTeacherLogits(inputs: inputs)
         } else {
             MLX.zeros([batchSize, inputs.shape[1], studentModel.vocabSize])
@@ -369,7 +372,7 @@ extension DistillationTrainer {
         let groundTruthLoss = MLXNN.crossEntropy(
             logits: flatStudentLogits,
             targets: flatTargets
-        )
+        ).mean()
         
         let distillationLoss = computeKLDivergence(
             studentLogits: flatStudentLogits,
@@ -377,7 +380,8 @@ extension DistillationTrainer {
             temperature: temperature
         )
         
-        let totalLoss = groundTruthWeight * groundTruthLoss + distillationWeight * distillationLoss
+        let distillWeight = (teacherModel != nil) ? distillationWeight : 0.0
+        let totalLoss = groundTruthWeight * groundTruthLoss + distillWeight * distillationLoss
         
         return totalLoss.item(Float.self)
     }

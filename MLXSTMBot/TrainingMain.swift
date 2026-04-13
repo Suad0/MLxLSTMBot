@@ -25,7 +25,7 @@ public class TrainingMain {
         let batchSize = 4
         let sequenceLength = 256
         let numIterations = 1
-        let learningRate: Float = 1e-8  // Even smaller learning rate
+        let learningRate: Float = 1e-4
         let printEvery = 1  // Print every step for debugging
         let saveEvery = 10
         let dataPath = "training_data.json"
@@ -40,6 +40,7 @@ public class TrainingMain {
     private var trainer: DistillationTrainer?
     private var studentModel: xLSTM?
     private var teacherModel: (any LanguageModel)?
+    private var tokenizer: Tokenizer?
     
     // MARK: - Main Training Function
     
@@ -78,26 +79,6 @@ public class TrainingMain {
     private func initializeModels() async throws {
         print("\n📚 Initializing Models...")
         
-        // Load teacher model (Llama-3.2-1B-Instruct-4bit)
-        print("Loading teacher model: \(config.teacherModelId)")
-        let modelFactory = LLMModelFactory.shared
-        let configuration = ModelConfiguration(id: config.teacherModelId)
-        
-        let container = try await modelFactory.loadContainer(configuration: configuration) { progress in
-            let percent = String(format: "%.1f", progress.fractionCompleted * 100)
-            print("\rTeacher model download: \(percent)%", terminator: "")
-            fflush(stdout)
-        }
-        
-        print("\n✓ Teacher model loaded successfully")
-        
-        // Enable Teacher Model
-        self.teacherModel = await container.perform { $0.model }
-        if self.teacherModel == nil {
-             print("Warning: Could not load teacher model. Distillation might fail.")
-        }
-
-        // Initialize student xLSTM model
         print("Initializing student xLSTM model...")
         self.studentModel = try xLSTM(
             vocabSize: config.vocabSize,
@@ -113,6 +94,27 @@ public class TrainingMain {
         
         // Calculate and display model parameters
         displayModelStats()
+
+        print("Loading teacher model: \(config.teacherModelId)")
+        let modelFactory = LLMModelFactory.shared
+        let configuration = ModelConfiguration(id: config.teacherModelId)
+        
+        let container = try await modelFactory.loadContainer(configuration: configuration) { progress in
+            let percent = String(format: "%.1f", progress.fractionCompleted * 100)
+            print("\rTeacher model download: \(percent)%", terminator: "")
+            fflush(stdout)
+        }
+        
+        print("\n✓ Teacher model loaded successfully")
+        
+        // Enable Teacher Model
+        self.teacherModel = await container.perform { model, _ in model }
+        if self.teacherModel == nil {
+             print("Warning: Could not load teacher model. Distillation might fail.")
+        }
+        
+        // Extract teacher tokenizer
+        self.tokenizer = await container.perform { _, tokenizer in tokenizer }
     }
     
     /// Sets up the data provider
@@ -125,13 +127,15 @@ public class TrainingMain {
             try ChatDataProvider.createSampleData(at: config.dataPath)
         }
         
-        // We need a tokenizer - for now we'll create a simple placeholder
-        // In practice, you'd get this from the teacher model
-        let tokenizer = SimpleTokenizer(vocabSize: config.vocabSize)
+        guard let actualTokenizer = self.tokenizer else {
+            fatalError("🚨 Critical Initialization Error: Teacher Tokenizer not found! Distillation requires a valid teacher tokenizer.")
+        }
         
+        // Use exact teacher vocabulary size for safety if possible
+        // Note: the tokenizer size might be larger than config.vocabSize, in reality we should match them
         self.dataProvider = try ChatDataProvider(
             jsonPath: config.dataPath,
-            tokenizer: tokenizer,
+            tokenizer: actualTokenizer,
             shuffle: true
         )
         
@@ -285,126 +289,7 @@ public class TrainingMain {
     }
 }
 
-// MARK: - Simple Tokenizer Implementation
 
-/// Simple tokenizer implementation for demonstration
-/// In practice, you would use the tokenizer from the teacher model
-public class SimpleTokenizer: Tokenizer {
-    private let vocabSize: Int
-    
-    public init(vocabSize: Int) {
-        self.vocabSize = vocabSize
-    }
-    
-    // MARK: - Required Tokenizer Protocol Methods
-    
-    public func tokenize(text: String) -> [String] {
-        // Simple character-level tokenization
-        return text.map { String($0) }
-    }
-    
-    public func encode(text: String) -> [Int] {
-        // Simple character-level tokenization for demonstration
-        let chars = Array(text.utf8)
-        return chars.map { Int($0) % vocabSize }
-    }
-    
-    public func encode(text: String, addSpecialTokens: Bool) -> [Int] {
-        var tokens = encode(text: text)
-        
-        if addSpecialTokens {
-            // Add BOS token at the beginning if available
-            if let bosId = bosTokenId {
-                tokens.insert(bosId, at: 0)
-            }
-            // Add EOS token at the end if available
-            if let eosId = eosTokenId {
-                tokens.append(eosId)
-            }
-        }
-        
-        return tokens
-    }
-    
-    public func decode(tokens: [Int]) throws -> String {
-        // Simple decoding - convert back to characters
-        let chars = tokens.map { UInt8($0 % 256) }
-        return String(bytes: chars, encoding: .utf8) ?? ""
-    }
-    
-    public func decode(tokens: [Int], skipSpecialTokens: Bool) -> String {
-        // Simple decoding with special token handling
-        var filteredTokens = tokens
-        
-        if skipSpecialTokens {
-            // Filter out special tokens
-            let specialTokenIds = [bosTokenId, eosTokenId, unknownTokenId].compactMap { $0 }
-            filteredTokens = tokens.filter { !specialTokenIds.contains($0) }
-        }
-        
-        let chars = filteredTokens.map { UInt8($0 % 256) }
-        return String(bytes: chars, encoding: .utf8) ?? ""
-    }
-    
-    public func convertTokenToId(_ token: String) -> Int? {
-        // Simple conversion for single characters
-        guard token.count == 1, let char = token.first else { return nil }
-        return Int(char.asciiValue ?? 0) % vocabSize
-    }
-    
-    public func convertIdToToken(_ id: Int) -> String? {
-        // Convert ID back to character
-        let charValue = UInt8(id % 256)
-        return String(Character(UnicodeScalar(charValue) ?? UnicodeScalar(32)!))
-    }
-    
-    // MARK: - Required Properties
-    
-    public var bosToken: String? { return "<bos>" }
-    public var bosTokenId: Int? { return 1 }
-    public var eosToken: String? { return "<eos>" }
-    public var eosTokenId: Int? { return 2 }
-    public var unknownToken: String? { return "<unk>" }
-    public var unknownTokenId: Int? { return 0 }
-    
-    // MARK: - Chat Template Methods (Simplified Implementation)
-    
-    public func applyChatTemplate(messages: [Message]) throws -> [Int] {
-        // Simple implementation - just concatenate message content
-        let combinedText = messages.compactMap { $0["content"] as? String }.joined(separator: " ")
-        return encode(text: combinedText, addSpecialTokens: true)
-    }
-    
-    public func applyChatTemplate(messages: [Message], tools: [ToolSpec]?) throws -> [Int] {
-        return try applyChatTemplate(messages: messages)
-    }
-    
-    public func applyChatTemplate(messages: [Message], tools: [ToolSpec]?, additionalContext: [String : Any]?) throws -> [Int] {
-        return try applyChatTemplate(messages: messages)
-    }
-    
-    public func applyChatTemplate(messages: [Message], chatTemplate: ChatTemplateArgument) throws -> [Int] {
-        return try applyChatTemplate(messages: messages)
-    }
-    
-    public func applyChatTemplate(messages: [Message], chatTemplate: String) throws -> [Int] {
-        return try applyChatTemplate(messages: messages)
-    }
-    
-    public func applyChatTemplate(messages: [Message], chatTemplate: ChatTemplateArgument?, addGenerationPrompt: Bool, truncation: Bool, maxLength: Int?, tools: [ToolSpec]?) throws -> [Int] {
-        var tokens = try applyChatTemplate(messages: messages)
-        
-        if let maxLen = maxLength, tokens.count > maxLen {
-            tokens = Array(tokens.prefix(maxLen))
-        }
-        
-        return tokens
-    }
-    
-    public func applyChatTemplate(messages: [Message], chatTemplate: ChatTemplateArgument?, addGenerationPrompt: Bool, truncation: Bool, maxLength: Int?, tools: [ToolSpec]?, additionalContext: [String : Any]?) throws -> [Int] {
-        return try applyChatTemplate(messages: messages, chatTemplate: chatTemplate, addGenerationPrompt: addGenerationPrompt, truncation: truncation, maxLength: maxLength, tools: tools)
-    }
-}
 
 // MARK: - Training Errors
 

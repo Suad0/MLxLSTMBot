@@ -103,7 +103,7 @@ public class mLSTM: Module {
     /// - Parameter batchSize: Size of the batch dimension
     /// - Returns: Tuple of initial state tensors (h_t, C_t)
     /// - Throws: LSTMError.invalidDimension if batch size is invalid
-    public func initialState(batchSize: Int) throws -> (MLXArray, MLXArray) {
+    public func initialState(batchSize: Int) throws -> (MLXArray, MLXArray, MLXArray) {
         // Validate batch size
         try LSTMUtils.validateBatchSize(batchSize)
         
@@ -115,7 +115,10 @@ public class mLSTM: Module {
         // Initialize matrix memory with identity matrix
         let C_t = LSTMUtils.createIdentityMatrix(batchSize: batchSize, dim: hiddenDim)
         
-        return (h_t, C_t)
+        // Initialize stabilizer state with zeros
+        let m_t = LSTMUtils.createTensor(shape: hiddenStateShape, value: 0.0)
+        
+        return (h_t, C_t, m_t)
     }
     
     // MARK: - Forward Pass
@@ -131,8 +134,8 @@ public class mLSTM: Module {
     ///   - input: Input tensor of shape [batch_size, input_dim]
     ///   - state: Tuple of (h_t, C_t) where h_t is [batch_size, hidden_dim] and C_t is [batch_size, hidden_dim, hidden_dim]
     /// - Returns: Tuple of (output, new_state) where output is [batch_size, hidden_dim] and new_state is (h_t, C_t)
-    public func callAsFunction(_ input: MLXArray, state: (MLXArray, MLXArray)) -> (MLXArray, (MLXArray, MLXArray)) {
-        let (h_prev, C_prev) = state
+    public func callAsFunction(_ input: MLXArray, state: (MLXArray, MLXArray, MLXArray)) -> (MLXArray, (MLXArray, MLXArray, MLXArray)) {
+        let (h_prev, C_prev, m_prev) = state
         
         do {
             // Comprehensive input validation
@@ -163,20 +166,29 @@ public class mLSTM: Module {
             try LSTMUtils.validateMatrixMemory(C_prev, batchSize: batchSize, hiddenDim: hiddenDim)
             
             // Validate device consistency
-            try LSTMUtils.validateSameDevice([input, h_prev, C_prev])
+            try LSTMUtils.validateSameDevice([input, h_prev, C_prev, m_prev])
             
             // Validate state stability
-            try LSTMUtils.validateStateStability([h_prev, C_prev])
+            try LSTMUtils.validateStateStability([h_prev, C_prev, m_prev])
             
             // Concatenate input and previous hidden state
             let combined = MLX.concatenated([input, h_prev], axis: -1)
             
-            // Compute gates using standard sigmoid activation
-            // i_t = sigmoid(W_i * x_t + U_i * h_{t-1} + b_i)
-            let i_t = MLX.sigmoid(inputProjection(combined))
+            // Compute gates using stabilized exponential gating
+            // z_i = W_i * x_t + U_i * h_{t-1} + b_i
+            let z_i = inputProjection(combined)
             
-            // f_t = sigmoid(W_f * x_t + U_f * h_{t-1} + b_f)
-            let f_t = MLX.sigmoid(forgetProjection(combined))
+            // z_f = W_f * x_t + U_f * h_{t-1} + b_f
+            let z_f = forgetProjection(combined)
+            
+            // Stabilizer state m_t
+            let m_t = MLX.maximum(z_f + m_prev, z_i)
+            
+            // i_t = exp(z_i - m_t)
+            let i_t = MLX.exp(z_i - m_t)
+            
+            // f_t = exp(z_f + m_{t-1} - m_t)
+            let f_t = MLX.exp(z_f + m_prev - m_t)
             
             // o_t = sigmoid(W_o * x_t + U_o * h_{t-1} + b_o)
             let o_t = MLX.sigmoid(outputProjection(combined))
@@ -220,8 +232,8 @@ public class mLSTM: Module {
             let h_t = o_t * MLX.tanh(retrieval_squeezed)
             
             // Validate output stability before returning
-            let newState = (h_t, C_t)
-            try LSTMUtils.validateStateStability([h_t, C_t])
+            let newState = (h_t, C_t, m_t)
+            try LSTMUtils.validateStateStability([h_t, C_t, m_t])
             
             return (h_t, newState)
             
@@ -241,7 +253,7 @@ extension mLSTM {
     
     /// Creates initial state with default batch size of 1
     /// - Returns: Initial state tuple for single sample
-    public func initialState() -> (MLXArray, MLXArray) {
+    public func initialState() -> (MLXArray, MLXArray, MLXArray) {
         do {
             return try initialState(batchSize: 1)
         } catch {
@@ -260,7 +272,7 @@ extension mLSTM {
     /// - Returns: Tuple of (outputs, final_state) where outputs contains all hidden states
     ///            and final_state is the last state tuple
     /// - Throws: LSTMError for invalid inputs
-    public func processSequence(_ sequence: MLXArray, initialState: (MLXArray, MLXArray)? = nil) throws -> (MLXArray, (MLXArray, MLXArray)) {
+    public func processSequence(_ sequence: MLXArray, initialState: (MLXArray, MLXArray, MLXArray)? = nil) throws -> (MLXArray, (MLXArray, MLXArray, MLXArray)) {
         // Validate sequence tensor
         try LSTMUtils.validateSequenceTensor(sequence)
         try LSTMUtils.validateInputTensor(sequence)
@@ -282,7 +294,7 @@ extension mLSTM {
         // Handle edge case: empty sequence
         if sequenceLength == 0 {
             let emptyOutputs = LSTMUtils.createTensor(shape: [batchSize, 0, hiddenDim])
-            let finalState: (MLXArray, MLXArray)
+            let finalState: (MLXArray, MLXArray, MLXArray)
             if let initialState = initialState {
                 finalState = initialState
             } else {
@@ -292,13 +304,13 @@ extension mLSTM {
         }
         
         // Use provided initial state or create default
-        var currentState: (MLXArray, MLXArray)
+        var currentState: (MLXArray, MLXArray, MLXArray)
         if let initialState = initialState {
             // Validate provided initial state
             let expectedHiddenShape = [batchSize, hiddenDim]
             try LSTMUtils.validateStateTensor(initialState.0, expectedShape: expectedHiddenShape)
             try LSTMUtils.validateMatrixMemory(initialState.1, batchSize: batchSize, hiddenDim: hiddenDim)
-            try LSTMUtils.validateStateStability([initialState.0, initialState.1])
+            try LSTMUtils.validateStateStability([initialState.0, initialState.1, initialState.2])
             currentState = initialState
         } else {
             currentState = try self.initialState(batchSize: batchSize)

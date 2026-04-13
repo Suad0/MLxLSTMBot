@@ -347,9 +347,11 @@ public class xLSTM: Module {
         let vocabSize = logits.shape[1]
         let actualK = min(k, vocabSize)
         
-        // For now, return original logits (top-k filtering can be implemented later)
-        // This is a simplified version - full top-k would require sorting
-        return logits
+        let sortedTokens = MLX.sorted(logits, axis: -1)
+        let kthIndex = vocabSize - actualK
+        let kth = sortedTokens[0..., kthIndex...kthIndex]
+        
+        return MLX.where(logits .>= kth, logits, MLXArray(-1e9))
     }
     
     /// Sample tokens from logits using multinomial sampling

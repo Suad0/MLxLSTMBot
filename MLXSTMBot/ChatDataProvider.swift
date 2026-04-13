@@ -158,24 +158,21 @@ public class ChatDataProvider {
     /// - Returns: Tuple of (input_sequence, target_sequence)
     private func createSequencePair(from tokens: [Int32], targetLength: Int) -> ([Int32], [Int32]) {
         var processedTokens = tokens
+        let requiredLength = targetLength + 1
         
         // Handle sequence length
-        if processedTokens.count < targetLength {
+        if processedTokens.count < requiredLength {
             // Pad with special padding token (0 is commonly used)
-            let paddingNeeded = targetLength - processedTokens.count
+            let paddingNeeded = requiredLength - processedTokens.count
             processedTokens.append(contentsOf: Array(repeating: 0, count: paddingNeeded))
-        } else if processedTokens.count > targetLength {
-            // Truncate to target length
-            processedTokens = Array(processedTokens.prefix(targetLength))
+        } else if processedTokens.count > requiredLength {
+            // Truncate to required length
+            processedTokens = Array(processedTokens.prefix(requiredLength))
         }
         
         // Create input (tokens 0 to N-1) and target (tokens 1 to N) sequences
-        let inputSeq = Array(processedTokens.prefix(targetLength - 1)) + [0] // Pad last input
-        let targetSeq = Array(processedTokens.suffix(targetLength - 1)) + [0] // Pad last target
-        
-        // Ensure both sequences are exactly targetLength
-        let finalInputSeq = Array(inputSeq.prefix(targetLength))
-        let finalTargetSeq = Array(targetSeq.prefix(targetLength))
+        let finalInputSeq = Array(processedTokens.prefix(targetLength))
+        let finalTargetSeq = Array(processedTokens.dropFirst().prefix(targetLength))
         
         return (finalInputSeq, finalTargetSeq)
     }

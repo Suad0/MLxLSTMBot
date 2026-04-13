@@ -12,14 +12,14 @@ import MLXNN
 /// Layer state type for xLSTM blocks
 public enum LayerState {
     case sLSTM(h: MLXArray, c: MLXArray, n: MLXArray, m: MLXArray)
-    case mLSTM(h: MLXArray, C: MLXArray)
+    case mLSTM(h: MLXArray, C: MLXArray, m: MLXArray)
     
     /// Extract hidden state from any layer type
     public var hiddenState: MLXArray {
         switch self {
         case .sLSTM(let h, _, _, _):
             return h
-        case .mLSTM(let h, _):
+        case .mLSTM(let h, _, _):
             return h
         }
     }
@@ -132,8 +132,8 @@ public class xLSTMBlock: Module {
             guard let mLSTM = mLSTMLayer else {
                 fatalError("mLSTM layer not initialized")
             }
-            let (h, C) = try mLSTM.initialState(batchSize: batchSize)
-            return .mLSTM(h: h, C: C)
+            let (h, C, m) = try mLSTM.initialState(batchSize: batchSize)
+            return .mLSTM(h: h, C: C, m: m)
         }
     }
     
@@ -183,10 +183,10 @@ public class xLSTMBlock: Module {
                 fatalError("mLSTM layer not initialized")
             }
             
-            if case .mLSTM(let h, let C) = state {
-                let (output, (newH, newC)) = mLSTM(normalizedInput, state: (h, C))
+            if case .mLSTM(let h, let C, let m) = state {
+                let (output, (newH, newC, newM)) = mLSTM(normalizedInput, state: (h, C, m))
                 lstmOutput = output
-                newLSTMState = .mLSTM(h: newH, C: newC)
+                newLSTMState = .mLSTM(h: newH, C: newC, m: newM)
             } else {
                 fatalError("Invalid state type for mLSTM block")
             }
