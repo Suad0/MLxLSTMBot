@@ -96,7 +96,7 @@ public class DistillationTrainer {
     ///   - targets: Target token sequences [batch_size, seq_len]
     /// - Returns: Combined loss value
     /// - Throws: Error if training step fails
-    public func trainingStep(inputs: MLXArray, targets: MLXArray) throws -> Float {
+    public func trainingStep(inputs: MLXArray, targets: MLXArray, padId: Int32) throws -> Float {
         currentStep += 1
         
         // Validate input shapes
@@ -118,6 +118,8 @@ public class DistillationTrainer {
             // Create dummy teacher logits with same shape as student output
             MLX.zeros([batchSize, seqLen, studentModel.vocabSize])
         }
+        
+        MLX.eval(teacherLogits) // Bug B9 Fix: Materialize logits before gradient closure
         
         // Define the loss function and gradient computation
         let lossAndGrad = MLXNN.valueAndGrad(model: studentModel) { [self] model, inputs, targets in
@@ -145,11 +147,13 @@ public class DistillationTrainer {
             let flatTargets = targets.reshaped([-1]) // [batch_size * seq_len]
             let flatTeacherLogits = teacherLogits.reshaped([-1, vocabSize]) // [batch_size * seq_len, vocab_size]
             
-            // Compute ground truth loss (cross-entropy)
-            let groundTruthLoss = MLXNN.crossEntropy(
+            let mask = (flatTargets .!= padId).asType(.float32)
+            let crossEnt = MLXNN.crossEntropy(
                 logits: flatStudentLogits,
                 targets: flatTargets
-            ).mean()
+            )
+            let groundTruthLoss = (crossEnt * mask).sum() / (mask.sum() + 1e-8) // Bug B11 Fix
+            
             
             // Compute distillation loss (KL divergence)
             let distillationLoss = computeKLDivergence(
@@ -241,13 +245,12 @@ public class DistillationTrainer {
     ///   - maxNorm: Maximum gradient norm
     /// - Returns: Clipped gradients
     private func clipGradients(_ gradients: ModuleParameters, maxNorm: Float) -> ModuleParameters {
-        // Calculate total gradient norm
-        var totalNorm: Float = 0.0
-        for (_, grad) in gradients.flattened() {
-            let gradNorm = MLX.sum(grad * grad).item(Float.self)
-            totalNorm += gradNorm
-        }
-        totalNorm = sqrt(totalNorm)
+        // Calculate total gradient norm using single CPU sync (Bug B10 Fix)
+        let flatGrads = gradients.flattened().map { $0.1 }
+        let squaredNorms = flatGrads.map { MLX.sum($0 * $0) }
+        let totalNormTensor = MLX.sqrt(squaredNorms.reduce(MLXArray(0.0), +))
+        MLX.eval(totalNormTensor)
+        let totalNorm = totalNormTensor.item(Float.self)
         
         // If total norm exceeds maxNorm, scale down all gradients
         if totalNorm > maxNorm {

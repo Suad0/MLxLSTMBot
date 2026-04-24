@@ -18,19 +18,19 @@ public class TrainingMain {
     // MARK: - Configuration
     
     struct TrainingConfig {
-        let teacherModelId = "mlx-community/Llama-3.2-1B-Instruct-4bit"
-        let vocabSize = 128256  // Match teacher vocabulary
-        let hiddenDim = 512
-        let numLayers = 6
-        let batchSize = 4
-        let sequenceLength = 256
-        let numIterations = 1
-        let learningRate: Float = 1e-4
-        let printEvery = 1  // Print every step for debugging
-        let saveEvery = 10
-        let dataPath = "training_data.json"
-        let outputPath = "xLSTM_Final.safetensors"
-        let statsPath = "training_stats.json"
+        var teacherModelId = "mlx-community/Llama-3.2-1B-Instruct-4bit"
+        var vocabSize = 128256  // Match teacher vocabulary
+        var hiddenDim = 512
+        var numLayers = 6
+        var batchSize = 4
+        var sequenceLength = 256
+        var numIterations = 1000 // Bug B12 Fix
+        var learningRate: Float = 1e-4
+        var printEvery = 1  // Print every step for debugging
+        var saveEvery = 10
+        var dataPath = "training_data.json"
+        var outputPath = "xLSTM_Final.safetensors"
+        var statsPath = "training_stats.json"
     }
     
     // MARK: - Properties
@@ -80,11 +80,11 @@ public class TrainingMain {
         print("\n📚 Initializing Models...")
         
         print("Initializing student xLSTM model...")
+        let blockSpec: [xLSTMBlockType] = [.mLSTM, .mLSTM, .mLSTM, .mLSTM, .mLSTM, .sLSTM]
         self.studentModel = try xLSTM(
             vocabSize: config.vocabSize,
             hiddenDim: config.hiddenDim,
-            numLayers: config.numLayers,
-            includeFeedForward: true
+            blockSpec: blockSpec
         )
         
         print("✓ Student xLSTM model initialized")
@@ -188,7 +188,7 @@ public class TrainingMain {
             )
             
             // Perform training step
-            let loss = try trainer.trainingStep(inputs: inputs, targets: targets)
+            let loss = try trainer.trainingStep(inputs: inputs, targets: targets, padId: dataProvider.padTokenId)
             totalLoss += loss
             
             // Print progress
@@ -257,19 +257,35 @@ public class TrainingMain {
     private func displayModelStats() {
         guard let student = studentModel else { return }
         
-        // Calculate approximate parameter count
+        // Calculate approximate parameter count based on correct mLSTM layout
         let embeddingParams = config.vocabSize * config.hiddenDim
-        let lstmParamsPerLayer = (config.hiddenDim + config.hiddenDim) * config.hiddenDim * 6
-        let ffnParamsPerLayer = config.hiddenDim * config.hiddenDim * 4 * 2
+        
+        let mLSTMParamsPerBlock = 
+            (config.hiddenDim * config.hiddenDim * 2) + // upProj
+            (config.hiddenDim * config.hiddenDim * 2) + // downProj
+            (config.hiddenDim * config.hiddenDim * 7) + // input, forget, output, skip, key, value, query
+            (config.hiddenDim * 4) + // conv1d (approx depthwise)
+            (config.hiddenDim) // groupNorm
+            
+        let sLSTMParamsPerBlock = 
+            (config.hiddenDim * config.hiddenDim * 4) + // input, forget, cell, output
+            (config.hiddenDim * config.hiddenDim * 4 * 2) // FFN
+            
         let lmHeadParams = config.hiddenDim * config.vocabSize
         
-        let totalParams = embeddingParams + (config.numLayers * lstmParamsPerLayer) + 
-                         (config.numLayers / 2 * ffnParamsPerLayer) + lmHeadParams
+        // 5 mLSTM + 1 sLSTM layout for 6 layers
+        let num_mLSTM = 5
+        let num_sLSTM = 1
+        
+        let totalParams = embeddingParams + 
+                          (num_mLSTM * mLSTMParamsPerBlock) +
+                          (num_sLSTM * sLSTMParamsPerBlock) + 
+                          lmHeadParams
         
         print("\n📊 Model Statistics:")
         print("  - Embedding parameters: ~\(embeddingParams / 1_000_000)M")
-        print("  - LSTM parameters: ~\(config.numLayers * lstmParamsPerLayer / 1_000_000)M")
-        print("  - FFN parameters: ~\(config.numLayers / 2 * ffnParamsPerLayer / 1_000_000)M")
+        print("  - mLSTM block parameters: ~\(num_mLSTM * mLSTMParamsPerBlock / 1_000_000)M")
+        print("  - sLSTM block parameters: ~\(num_sLSTM * sLSTMParamsPerBlock / 1_000_000)M")
         print("  - LM Head parameters: ~\(lmHeadParams / 1_000_000)M")
         print("  - Total parameters: ~\(totalParams / 1_000_000)M")
     }

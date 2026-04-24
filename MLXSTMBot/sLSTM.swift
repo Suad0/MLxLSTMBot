@@ -106,8 +106,8 @@ public class sLSTM: Module {
         let h_t = LSTMUtils.createTensor(shape: stateShape, value: 0.0)
         let c_t = LSTMUtils.createTensor(shape: stateShape, value: 0.0)
         
-        // Initialize normalizer state with 1.0
-        let n_t = LSTMUtils.createTensor(shape: stateShape, value: 1.0)
+        // Initialize normalizer state with 0.0 (Bug B1 fix)
+        let n_t = LSTMUtils.createTensor(shape: stateShape, value: 0.0)
 
         // Initialize stabilizer state with 0.0
         let m_t = LSTMUtils.createTensor(shape: stateShape, value: 0.0)
@@ -139,10 +139,9 @@ public class sLSTM: Module {
     /// - Returns: Tuple of (output, new_state) where output is the hidden state
     ///            and new_state is the updated (h_t, c_t, n_t) tuple
     /// - Throws: LSTMError for invalid inputs or numerical issues
-    public func callAsFunction(_ input: MLXArray, state: (MLXArray, MLXArray, MLXArray, MLXArray)) -> (MLXArray, (MLXArray, MLXArray, MLXArray, MLXArray)) {
+    public func callAsFunction(_ input: MLXArray, state: (MLXArray, MLXArray, MLXArray, MLXArray)) throws -> (MLXArray, (MLXArray, MLXArray, MLXArray, MLXArray)) {
         let (h_prev, c_prev, n_prev, m_prev) = state
         
-        do {
             // Comprehensive input validation
             try LSTMUtils.validateInputTensor(input)
             
@@ -225,14 +224,6 @@ public class sLSTM: Module {
             
             let newState = (h_t, c_t, n_t, m_t)
             return (h_t, newState)
-            
-        } catch let error as LSTMUtils.LSTMError {
-            // Re-throw LSTM-specific errors
-            fatalError("sLSTM forward pass error: \(error.localizedDescription)")
-        } catch {
-            // Handle unexpected errors
-            fatalError("Unexpected error in sLSTM forward pass: \(error)")
-        }
     }
 }
 
@@ -310,7 +301,7 @@ extension sLSTM {
         // Process each timestep
         for t in 0..<sequenceLength {
             let timestepInput = sequence[0..., t, 0...]  // [batch_size, input_dim]
-            let (output, newState) = callAsFunction(timestepInput, state: currentState)
+            let (output, newState) = try callAsFunction(timestepInput, state: currentState)
             outputs.append(output)
             currentState = newState
         }

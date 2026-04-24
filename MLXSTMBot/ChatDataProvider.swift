@@ -23,6 +23,11 @@ public class ChatDataProvider {
     /// The tokenizer instance from MLXLLM
     private let tokenizer: any Tokenizer
     
+    /// Public access to pad token for loss masking
+    public var padTokenId: Int32 {
+        return Int32(tokenizer.eosTokenId ?? 2)
+    }
+    
     /// Raw text data loaded from JSON
     private var textData: [String] = []
     
@@ -162,9 +167,10 @@ public class ChatDataProvider {
         
         // Handle sequence length
         if processedTokens.count < requiredLength {
-            // Pad with special padding token (0 is commonly used)
+            // Pad using EOS token
+            let padToken = self.padTokenId
             let paddingNeeded = requiredLength - processedTokens.count
-            processedTokens.append(contentsOf: Array(repeating: 0, count: paddingNeeded))
+            processedTokens.append(contentsOf: Array(repeating: padToken, count: paddingNeeded))
         } else if processedTokens.count > requiredLength {
             // Truncate to required length
             processedTokens = Array(processedTokens.prefix(requiredLength))

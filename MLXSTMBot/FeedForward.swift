@@ -63,7 +63,7 @@ public class GatedFeedForward: Module {
     /// - Returns: Output tensor of same shape as input
     public func callAsFunction(_ input: MLXArray) -> MLXArray {
         // Compute gate and value projections
-        let gate = MLX.sigmoid(gateProjection(input))
+        let gate = MLXNN.gelu(gateProjection(input))
         let value = valueProjection(input)
         
         // Apply gating mechanism

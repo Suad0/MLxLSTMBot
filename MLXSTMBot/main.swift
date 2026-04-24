@@ -55,7 +55,7 @@ func runInteractiveMode() {
 
     print("Loading model: \(modelId)...")
 
-    let task = Task {
+    let _ = Task {
         do {
             let model = try await modelFactory.loadContainer(configuration: configuration) { progress in
                 let percent = String(format: "%.1f", progress.fractionCompleted * 100)
@@ -129,8 +129,8 @@ func runArchitectureTests() {
         let sLSTMBlockState = try sLSTMBlock.initialState(batchSize: batchSize)
         let mLSTMBlockState = try mLSTMBlock.initialState(batchSize: batchSize)
         
-        let (sLSTMBlockOutput, _) = sLSTMBlock(blockInput, state: sLSTMBlockState)
-        let (mLSTMBlockOutput, _) = mLSTMBlock(blockInput, state: mLSTMBlockState)
+        let (sLSTMBlockOutput, _) = try sLSTMBlock(blockInput, state: sLSTMBlockState)
+        let (mLSTMBlockOutput, _) = try mLSTMBlock(blockInput, state: mLSTMBlockState)
         
         print("✓ Block processing successful")
         print("  - sLSTM block output shape: \(sLSTMBlockOutput.shape)")
@@ -140,19 +140,18 @@ func runArchitectureTests() {
         
         // Create full xLSTM model
         let vocabSize = 1000
-        let numLayers = 4
+        let blockSpec: [xLSTMBlockType] = [.mLSTM, .sLSTM, .mLSTM, .sLSTM]
         
         let xlstm = try xLSTM(
             vocabSize: vocabSize,
             hiddenDim: hiddenDim,
-            numLayers: numLayers,
-            includeFeedForward: true
+            blockSpec: blockSpec
         )
         
         print("✓ xLSTM model created")
         print("  - Vocabulary size: \(vocabSize)")
         print("  - Hidden dimension: \(hiddenDim)")
-        print("  - Number of layers: \(numLayers)")
+        print("  - Number of layers: \(blockSpec.count)")
         print("  - Layer pattern: [mLSTM, sLSTM, mLSTM, sLSTM]")
         
         print("\n4. Testing Text Generation (Single Token)...")
