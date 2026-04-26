@@ -1,6 +1,5 @@
 # GEMINI.md — MLXSTMBot Project Context
-# Place this file in the root of your MLXSTMBot Xcode project.
-# Gemini CLI reads it automatically at the start of every session.
+
 
 ---
 
