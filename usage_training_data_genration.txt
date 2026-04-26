@@ -1,0 +1,28 @@
+uv init 
+uv add datasets
+uv add tqdm
+
+
+# Quick smoke-test: 2 000 samples (~2 min on a fast connection)
+python generate_training_data.py --samples 2000
+
+# Recommended first real run: 10 000 samples (~8-12 min)
+python generate_training_data.py --samples 10000
+
+# Full production run: 50 000 samples
+python generate_training_data.py --samples 50000 --output training_data.json
+
+# Then verify, build, and train as usual:
+./build.sh && ./train.sh
+
+What it does and why
+Single dependency beyond stdlib: only datasets (HuggingFace) and tqdm. No PyTorch, no Transformers, no GPU needed. The datasets library streams data over HTTP in chunks — it never downloads the full corpus to disk, which matters because OpenWebText alone is ~40 GB uncompressed.
+Four sources, intentionally balanced:
+SourceShareWhyWikipedia35%Clean, factual, well-punctuated prose — excellent for low perplexityOpenWebText35%The exact corpus GPT-2 was trained on; maximally diverse web languageBookCorpus20%Long-form narrative teaches coherent multi-sentence structureHH-RLHF (helpful half)10%Real human question phrasing — improves instruction-following tone
+The 35/35/20/10 split is deliberate. Heavily upweighting Wikipedia alone would bias the model toward formal encyclopedic style. The web text provides coverage. Book corpus provides coherence. RLHF data provides the conversational register your Llama teacher specialises in.
+Quality gate (is_valid): every sample must pass three checks — length bounds (80–2048 chars), at least one sentence-ending punctuation mark, and no more than 30% non-ASCII characters. The last check silently discards garbled encoding artefacts that appear in both BookCorpus and OpenWebText at low frequency.
+Text cleaning pipeline: strips residual HTML tags, bare URLs, and Wikipedia section headers (== Header ==), then collapses whitespace runs. Nothing more aggressive — over-cleaning removes linguistic structure the model needs to learn.
+Exact deduplication: before writing, the script deduplicates on the full string. This matters for BookCorpus in particular, which has near-duplicate sentences across books.
+Final shuffle: sources are interleaved randomly before writing. If you skip the shuffle, ChatDataProvider sees all Wikipedia entries first, then all web text, then books — the loss curve will show epoch-like jumps every time the source changes.
+
+The --max-chars 2048 default maps to roughly 512 tokens for Llama's tokenizer, which matches your sequenceLength = 256 setting with a comfortable margin. If you increase sequenceLength in TrainingConfig, increase --max-chars proportionally (roughly 4× the token count).
