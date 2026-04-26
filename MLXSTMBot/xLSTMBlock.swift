@@ -47,7 +47,7 @@ public class xLSTMBlock: Module {
     
     // sLSTM specifics
     public let sLSTMLayer: sLSTM?
-    public let feedForward: GatedFeedForward?
+    public let feedForward: SwiGLUFeedForward?
     public let postNorm: LayerNorm?
     
     // mLSTM specifics
@@ -73,7 +73,7 @@ public class xLSTMBlock: Module {
             self.downProjection = nil
             
             if includeFeedForward {
-                self.feedForward = GatedFeedForward(inputDim: hiddenDim)
+                self.feedForward = SwiGLUFeedForward(inputDim: hiddenDim)
                 self.postNorm = LayerNorm(dimensions: hiddenDim, eps: 1e-5)
             } else {
                 self.feedForward = nil
@@ -81,7 +81,11 @@ public class xLSTMBlock: Module {
             }
             
         case .mLSTM:
-            self.mLSTMLayer = try mLSTM(inputDim: hiddenDim, hiddenDim: hiddenDim)
+            // x_up is split 50/50 into x_l and x_g, each of width hiddenDim.
+            // mLSTM receives x_l which is hiddenDim wide.
+            // This is explicit and matches the split on lines below.
+            let mLSTMInputDim = hiddenDim  // x_l width after splitting x_up in half
+            self.mLSTMLayer = try mLSTM(inputDim: mLSTMInputDim, hiddenDim: hiddenDim)
             self.sLSTMLayer = nil
             
             // Bug B5: Complete mLSTM block structure
@@ -154,6 +158,9 @@ public class xLSTMBlock: Module {
             // Shape of x_up is [batchSize, hiddenDim * 2]
             let x_l = x_up[0..., 0..<hiddenDim]
             let x_g = x_up[0..., hiddenDim...]
+            
+            assert(x_l.shape[1] == mLSTM.inputDim,
+                   "x_l width \(x_l.shape[1]) must match mLSTM inputDim \(mLSTM.inputDim)")
             
             let (h_t, (newH, newC, newN, newM)) = try mLSTM(x_l, state: (h, C, n, m))
             newLSTMState = .mLSTM(h: newH, C: newC, n: newN, m: newM)

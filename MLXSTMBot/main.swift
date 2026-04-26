@@ -15,7 +15,7 @@ import AppKit
 // MARK: - Main Application Entry Point
 
 print("🚀 MLXSTMBot - xLSTM Knowledge Distillation Training")
-print("=" * 60)
+print(String(repeating: "=", count: 60))
 
 // Check command line arguments for mode selection
 let arguments = CommandLine.arguments

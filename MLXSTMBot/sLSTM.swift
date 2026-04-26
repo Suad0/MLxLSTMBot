@@ -106,8 +106,8 @@ public class sLSTM: Module {
         let h_t = LSTMUtils.createTensor(shape: stateShape, value: 0.0)
         let c_t = LSTMUtils.createTensor(shape: stateShape, value: 0.0)
         
-        // Initialize normalizer state with 0.0 (Bug B1 fix)
-        let n_t = LSTMUtils.createTensor(shape: stateShape, value: 0.0)
+        // Initialize normalizer state with 1.0 (Bug B1 fix)
+        let n_t = LSTMUtils.createTensor(shape: stateShape, value: 1.0)
 
         // Initialize stabilizer state with 0.0
         let m_t = LSTMUtils.createTensor(shape: stateShape, value: 0.0)
@@ -231,15 +231,7 @@ public class sLSTM: Module {
 
 extension sLSTM {
     
-    /// Creates initial state with default batch size of 1
-    /// - Returns: Initial state tuple for single sample
-    public func initialState() -> (MLXArray, MLXArray, MLXArray, MLXArray) {
-        do {
-            return try initialState(batchSize: 1)
-        } catch {
-            fatalError("Failed to create initial state: \(error)")
-        }
-    }
+
     
     /// Process a full sequence of inputs
     /// 

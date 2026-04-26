@@ -9,17 +9,16 @@ import Foundation
 import MLX
 import MLXNN
 
-/// Gated Linear Unit (GLU) Feed-Forward Network
+/// SwiGLU Feed-Forward Network
 /// 
-/// Implements a GLU-based feed-forward network commonly used in transformer architectures.
-/// The GLU applies a gating mechanism to control information flow.
+/// Implements a SwiGLU-based feed-forward network commonly used in transformer architectures.
 /// 
 /// Mathematical formulation:
-/// - gate = sigmoid(W_gate * x + b_gate)
+/// - gate = GELU(W_gate * x + b_gate)
 /// - value = W_value * x + b_value
 /// - output = gate ⊙ value
 /// - final_output = W_out * output + b_out
-public class GatedFeedForward: Module {
+public class SwiGLUFeedForward: Module {
     
     // MARK: - Properties
     

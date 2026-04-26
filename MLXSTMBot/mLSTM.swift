@@ -63,7 +63,7 @@ public class mLSTM: Module {
         self.groupNorm = GroupNorm(groupCount: hiddenDim / 64 > 0 ? hiddenDim / 64 : 1, dimensions: hiddenDim)
         
         // Depthwise causal conv
-        self.conv1dCausal = Conv1d(inputChannels: inputDim, outputChannels: inputDim, kernelSize: 4, stride: 1, padding: 3, groups: inputDim)
+        self.conv1dCausal = Conv1d(inputChannels: inputDim, outputChannels: inputDim, kernelSize: 4, stride: 1, padding: 0, groups: inputDim)
         
         super.init()
     }
@@ -86,7 +86,7 @@ public class mLSTM: Module {
     
     // MARK: - Forward Pass
     
-    public func callAsFunction(_ input: MLXArray, state: (MLXArray, MLXArray, MLXArray, MLXArray)) throws -> (MLXArray, (MLXArray, MLXArray, MLXArray, MLXArray)) {
+    public func callAsFunction(_ input: MLXArray, state: (MLXArray, MLXArray, MLXArray, MLXArray), precomputedConv: MLXArray? = nil) throws -> (MLXArray, (MLXArray, MLXArray, MLXArray, MLXArray)) {
         let (h_prev, C_prev, n_prev, m_prev) = state
         
         // Comprehensive input validation
@@ -114,14 +114,16 @@ public class mLSTM: Module {
         try LSTMUtils.validateMatrixMemory(C_prev, batchSize: batchSize, hiddenDim: hiddenDim)
         try LSTMUtils.validateSameDevice([input, h_prev, C_prev, n_prev, m_prev])
         
-        // Causal conv on a single timestep: padding with 0s or keeping state is tricky in callAsFunction. 
-        // For accurate single step auto-regressive generation, tracking a conv state buffer is ideal, 
-        // but since we only have single x_t here, we simulate it or treat it as a point-wise application.
-        // We'll apply it directly on the expanded input.
-        let x_expanded = input.reshaped([batchSize, 1, inputDim])
-        var convOut = conv1dCausal(x_expanded)
-        convOut = convOut[0..., 0..<1, 0...] // Truncate padded parts to sequence length 1
-        let x_conv = convOut.squeezed(axis: 1)
+        let x_conv: MLXArray
+        if let precomputedConv = precomputedConv {
+            x_conv = precomputedConv
+        } else {
+            // For single-step autoregressive inference, left-pad with kernelSize-1 zeros
+            let leftPad = MLX.zeros([batchSize, 3, inputDim])
+            let x_padded = MLX.concatenated([leftPad, input.reshaped([batchSize, 1, inputDim])], axis: 1)
+            let convOut = conv1dCausal(x_padded) // shape: [batchSize, 1, inputDim]
+            x_conv = convOut.squeezed(axis: 1)
+        }
         
         // Query, Key, Value
         let q_t = queryProjection(x_conv)
@@ -178,13 +180,7 @@ public class mLSTM: Module {
 
 extension mLSTM {
     
-    public func initialState() -> (MLXArray, MLXArray, MLXArray, MLXArray) {
-        do {
-            return try initialState(batchSize: 1)
-        } catch {
-            fatalError("Failed to create initial state: \(error)")
-        }
-    }
+
     
     public func processSequence(_ sequence: MLXArray, initialState: (MLXArray, MLXArray, MLXArray, MLXArray)? = nil) throws -> (MLXArray, (MLXArray, MLXArray, MLXArray, MLXArray)) {
         try LSTMUtils.validateSequenceTensor(sequence)
@@ -218,11 +214,17 @@ extension mLSTM {
         var outputs: [MLXArray] = []
         outputs.reserveCapacity(sequenceLength)
         
+        // Left-pad the full sequence for causal conv, then apply once
+        let seqLeftPad = MLX.zeros([batchSize, 3, inputDim])
+        let seqPadded  = MLX.concatenated([seqLeftPad, sequence], axis: 1)
+        let convSequence = conv1dCausal(seqPadded) // [batchSize, sequenceLength, inputDim]
+        
         // Process each timestep sequentially
         // For performance, sequences could be processed with graph trace, but loop fits autograd memory dynamically
         for t in 0..<sequenceLength {
             let timestepInput = sequence[0..., t, 0...] // [batch_size, input_dim]
-            let (output, newState) = try callAsFunction(timestepInput, state: currentState)
+            let timestepConv = convSequence[0..., t, 0...] // Extract precomputed conv for this timestep
+            let (output, newState) = try callAsFunction(timestepInput, state: currentState, precomputedConv: timestepConv)
             outputs.append(output)
             currentState = newState
         }

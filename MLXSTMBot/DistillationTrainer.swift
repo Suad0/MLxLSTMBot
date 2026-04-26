@@ -43,6 +43,8 @@ public class DistillationTrainer {
     
     /// Loss history for monitoring
     private var lossHistory: [Float] = []
+    /// Verbose output flag
+    private let verbose: Bool
     
     // MARK: - Initialization
     
@@ -60,13 +62,15 @@ public class DistillationTrainer {
         learningRate: Float = 1e-4,
         temperature: Float = 2.0,
         distillationWeight: Float = 0.7,
-        groundTruthWeight: Float = 0.3
+        groundTruthWeight: Float = 0.3,
+        verbose: Bool = false
     ) {
         self.studentModel = studentModel
         self.teacherModel = teacherModel
         self.temperature = temperature
         self.distillationWeight = distillationWeight
         self.groundTruthWeight = groundTruthWeight
+        self.verbose = verbose
         
         // Initialize AdamW optimizer
         self.optimizer = AdamW(learningRate: learningRate)
@@ -83,9 +87,12 @@ public class DistillationTrainer {
     
     /// Sets the teacher model to evaluation mode
     private func setTeacherEvalMode() {
-        // The teacher model should be in eval mode to prevent gradient computation
-        // This is handled by not including teacher parameters in the gradient computation
-        print("Teacher model set to evaluation mode")
+        if let teacherModule = teacherModel as? Module {
+            teacherModule.freeze(recursive: true)
+            print("Teacher model frozen — parameters excluded from gradient graph")
+        } else {
+            print("Warning: could not freeze teacher model — ensure it is not trainable")
+        }
     }
     
     // MARK: - Training Step
@@ -121,13 +128,16 @@ public class DistillationTrainer {
         
         MLX.eval(teacherLogits) // Bug B9 Fix: Materialize logits before gradient closure
         
+        // Initialize student states for this batch outside the closure
+        let initialStates = try studentModel.initialStates(batchSize: batchSize)
+
         // Define the loss function and gradient computation
         let lossAndGrad = MLXNN.valueAndGrad(model: studentModel) { [self] model, inputs, targets in
-            // Initialize student states for this batch
-            let initialStates = try! model.initialStates(batchSize: batchSize)
-            
             // Forward pass through student model
-            let (studentLogits, _) = try! model.processSequence(inputs, states: initialStates)
+            guard let (studentLogits, _) = try? model.processSequence(inputs, states: initialStates) else {
+                print("Warning: processSequence failed in gradient closure at step \(self.currentStep)")
+                return MLXArray(Float.greatestFiniteMagnitude)
+            }
             
             // Reshape logits for loss computation
             // studentLogits: [batch_size, seq_len, vocab_size]
@@ -136,11 +146,13 @@ public class DistillationTrainer {
             let vocabSize = studentLogits.shape[2]
             
              // Debug: Check for NaNs
-            if LSTMUtils.hasNaNOrInf(studentLogits) {
-                 print("  DEBUG: Student Logits contain NaN/Inf")
-            }
-            if LSTMUtils.hasNaNOrInf(teacherLogits) {
-                 print("  DEBUG: Teacher Logits contain NaN/Inf")
+            if self.verbose {
+                if LSTMUtils.hasNaNOrInf(studentLogits) {
+                     print("  DEBUG: Student Logits contain NaN/Inf")
+                }
+                if LSTMUtils.hasNaNOrInf(teacherLogits) {
+                     print("  DEBUG: Teacher Logits contain NaN/Inf")
+                }
             }
             
             let flatStudentLogits = studentLogits.reshaped([-1, vocabSize]) // [batch_size * seq_len, vocab_size]
@@ -162,7 +174,7 @@ public class DistillationTrainer {
                 temperature: self.temperature
             )
             
-            print("  DEBUG: GT Loss: \(groundTruthLoss.item(Float.self)), Distill Loss: \(distillationLoss.item(Float.self))")
+            if self.verbose { print("  DEBUG: GT Loss: \(groundTruthLoss.item(Float.self)), Distill Loss: \(distillationLoss.item(Float.self))") }
             
             // Combine losses
             let distillWeight = (self.teacherModel != nil) ? self.distillationWeight : 0.0
@@ -180,12 +192,13 @@ public class DistillationTrainer {
         
         // Update model parameters
         optimizer.update(model: studentModel, gradients: clippedGradients)
-        // Record loss
+        
+        // Flush the full computation graph (params + optimizer state) before reading any scalar
+        MLX.eval(studentModel, optimizer)
+
+        // Now it is safe to read the loss scalar
         let lossValue = loss.item(Float.self)
         lossHistory.append(lossValue)
-        
-        // Force evaluation of the graph once per step, rather than sequentially per-timestep
-        MLX.eval(studentModel, optimizer)
         
         return lossValue
     }
@@ -199,15 +212,12 @@ public class DistillationTrainer {
             throw DistillationError.teacherInferenceFailed("No teacher model available")
         }
         
-        // Wrap inputs in LMInput.Text for the LanguageModel protocol
-        let textInput = LMInput.Text(tokens: inputs)
-        
         // Perform inference using the teacher model
         // Passing cache: nil ensures the model processes the entire sequence in parallel
-        // output.logits shape: [batch_size, seq_len, vocab_size]
-        let output = teacher(textInput, cache: nil, state: nil)
+        // returns MLXArray directly
+        let logits = teacher(inputs, cache: nil)
         
-        return output.logits
+        return logits
     }
     
     /// Computes KL divergence loss between student and teacher logits
@@ -235,8 +245,11 @@ public class DistillationTrainer {
         // KL(teacher || student) = sum(teacher * (log_teacher - log_student))
         let klDiv = teacherProbs * (logTeacherProbs - logStudentProbs)
 
-        // Mean over batch, sum over vocabulary dimension
-        return MLX.mean(MLX.sum(klDiv, axis: -1)) * (temperature * temperature)
+        // Return raw KL without T² correction; caller applies distillationWeight.
+        // If you want the Hinton gradient-scale correction, multiply the *gradient*
+        // by T², not the loss value itself. Multiplying the loss shifts the absolute
+        // magnitude and breaks the distillationWeight / groundTruthWeight ratio.
+        return MLX.mean(MLX.sum(klDiv, axis: -1))
     }
     
     /// Clips gradients to prevent exploding gradients
@@ -259,7 +272,7 @@ public class DistillationTrainer {
             // Apply scaling while preserving the nested structure
             let clippedGradients = gradients.mapValues { $0 * scale }
             
-            print("Gradient clipping applied: norm=\(totalNorm), scale=\(scale)")
+            if self.verbose { print("Gradient clipping applied: norm=\(totalNorm), scale=\(scale)") }
             return clippedGradients
         }
         

@@ -328,7 +328,7 @@ public enum TrainingError: Error, LocalizedError {
 
 // MARK: - String Extension for Repetition
 
-extension String {
+private extension String {
     static func * (string: String, count: Int) -> String {
         return String(repeating: string, count: count)
     }

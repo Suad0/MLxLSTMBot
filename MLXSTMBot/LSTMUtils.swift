@@ -254,6 +254,6 @@ public struct LSTMUtils {
     /// - Returns: Batched identity matrices
     public static func createIdentityMatrix(batchSize: Int, dim: Int) -> MLXArray {
         let identity = MLX.eye(dim)
-        return MLX.broadcast(identity.expandedDimensions(axis: 0), to: [batchSize, dim, dim])
+        return MLX.stacked(Array(repeating: identity, count: batchSize), axis: 0)
     }
 }
