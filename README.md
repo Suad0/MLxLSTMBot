@@ -147,7 +147,7 @@ The teacher model (`mlx-community/Llama-3.2-1B-Instruct-4bit`) is approximately 
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/MLXSTMBot.git
+git clone https://github.com/Suad0/MLXSTMBot.git
 cd MLXSTMBot
 ```
 
